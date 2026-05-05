@@ -130,7 +130,6 @@ public class BigRational {
         return numerator.hashCode() * 31 + denominator.hashCode();
     }
 
-    // 最简分数形式
     @Override
     public String toString() {
         if (denominator.equals(BigInteger.ONE)) {
@@ -140,14 +139,11 @@ public class BigRational {
         }
     }
 
-    // 获取分子（只读）
     public BigInteger getNumerator() { return numerator; }
     public BigInteger getDenominator() { return denominator; }
 
     /**
      * 将有理数转换为十进制字符串，保留 digits 位小数（四舍五入）
-     * @param digits 小数位数（≥0）
-     * @return 十进制字符串，例如 "0.333" 或 "-1.5"
      */
     public String toDecimal(int digits) {
         if (digits < 0) {
@@ -164,7 +160,6 @@ public class BigRational {
         BigInteger intPart = absNum.divide(den);
         BigInteger remainder = absNum.remainder(den);
 
-        // 无小数部分
         if (remainder.equals(BigInteger.ZERO)) {
             String intStr = intPart.toString();
             if (negative) intStr = "-" + intStr;
@@ -172,7 +167,6 @@ public class BigRational {
             return intStr + "." + "0".repeat(digits);
         }
 
-        // 计算 digits+1 位小数
         int[] digitsArr = new int[digits + 1];
         BigInteger r = remainder;
         for (int i = 0; i <= digits; i++) {
@@ -181,7 +175,6 @@ public class BigRational {
             r = r.remainder(den);
         }
 
-        // 四舍五入
         boolean carry = digitsArr[digits] >= 5;
         for (int i = digits - 1; i >= 0 && carry; i--) {
             digitsArr[i]++;
@@ -211,14 +204,79 @@ public class BigRational {
         return sb.toString();
     }
 
-    // ========== 主方法：计算调和级数 H_n ==========
-    public static void main(String[] args) {
-        int n = 10;  // 可修改为更大的值（如 100），但分数会非常巨大
-        BigRational sum = new BigRational("0");
-        for (int k = 1; k <= n; k++) {
-            sum = sum.add(new BigRational("1/" + k));
+    // ========== 连分数工具方法 ==========
+    /**
+     * 根据连分数系数数组 [a0, a1, ..., ak] 计算所有收敛 C0..Ck
+     * @param a 系数数组，a0 是整数，a1..ak 是正整数
+     * @return 收敛的 BigRational 数组
+     */
+    public static BigRational[] convergents(int[] a) {
+        int k = a.length - 1;
+        BigRational[] conv = new BigRational[k + 1];
+        // 递推公式: p_{-2}=0, p_{-1}=1; q_{-2}=1, q_{-1}=0
+        BigInteger pPrev2 = BigInteger.ZERO;
+        BigInteger pPrev1 = BigInteger.ONE;
+        BigInteger qPrev2 = BigInteger.ONE;
+        BigInteger qPrev1 = BigInteger.ZERO;
+        for (int i = 0; i <= k; i++) {
+            BigInteger ai = BigInteger.valueOf(a[i]);
+            BigInteger p = ai.multiply(pPrev1).add(pPrev2);
+            BigInteger q = ai.multiply(qPrev1).add(qPrev2);
+            conv[i] = new BigRational(p, q);
+            // 滑动
+            pPrev2 = pPrev1;
+            pPrev1 = p;
+            qPrev2 = qPrev1;
+            qPrev1 = q;
         }
-        System.out.println("H_" + n + " 精确分数 = " + sum);
-        System.out.println("H_" + n + " 十进制近似 = " + sum.toDecimal(10));
+        return conv;
+    }
+
+    /**
+     * 生成 e 的连分数系数，长度为 n+1 (a0..an)
+     * e = [2; 1,2,1,1,4,1,1,6,1,1,8,...]
+     */
+    public static int[] generateECoeff(int n) {
+        int[] a = new int[n + 1];
+        a[0] = 2;
+        int k = 2;
+        for (int i = 1; i <= n; i++) {
+            if (i % 3 == 1) {
+                a[i] = 1;
+            } else if (i % 3 == 2) {
+                a[i] = k;
+                k += 2;
+            } else { // i % 3 == 0
+                a[i] = 1;
+            }
+        }
+        return a;
+    }
+
+    // ========== 主方法：演示连分数逼近 ==========
+    public static void main(String[] args) {
+        // 1. √2 的连分数 [1;2,2,2,...]
+        System.out.println("=== √2 的连分数收敛 ===");
+        int sqrt2Depth = 5;  // 计算 C0 到 C5
+        int[] sqrt2Coeff = new int[sqrt2Depth + 1];
+        sqrt2Coeff[0] = 1;
+        for (int i = 1; i <= sqrt2Depth; i++) {
+            sqrt2Coeff[i] = 2;
+        }
+        BigRational[] sqrt2Conv = convergents(sqrt2Coeff);
+        for (int i = 0; i <= sqrt2Depth; i++) {
+            System.out.printf("C_%d = %-12s ≈ %s\n",
+                    i, sqrt2Conv[i], sqrt2Conv[i].toDecimal(10));
+        }
+
+        // 2. e 的连分数 [2;1,2,1,1,4,1,1,6,...]
+        System.out.println("\n=== e 的连分数收敛 ===");
+        int eDepth = 8;  // 计算 C0 到 C8
+        int[] eCoeff = generateECoeff(eDepth);
+        BigRational[] eConv = convergents(eCoeff);
+        for (int i = 0; i <= eDepth; i++) {
+            System.out.printf("C_%d = %-12s ≈ %s\n",
+                    i, eConv[i], eConv[i].toDecimal(10));
+        }
     }
 }
